@@ -4,12 +4,13 @@ fleiss.py - calculates fleiss' kappa to measure the inter annottor agreement bet
 
 example_kappa.py - example usage of fleiss.py
 
-##Emotion analysis specific scripts -
+##Emotion analysis specific scripts-
+(contains certain generalizable contents)
 HumanMachineAgreement.py - Calculates inter annotator agreement between humans and with machine
 
 MeanNormalize.py - mean normalize the FACET data
 
-elan_offset_calibrator.py - 
+elan_offset_calibrator.py - Calculates and fixes offset between Elan and game log files for all the participants in the directory.
 
 ##Not so interesting scripts -
 video_corpus_elan_generator.py - creates elan files for a video corpus
