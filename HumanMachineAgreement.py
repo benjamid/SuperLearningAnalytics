@@ -7,7 +7,7 @@ Emotion Analysis: Calculate inter annotator agreement
 Needs Fleiss kappa implementation (fleiss.py)
 
 command line arguments -
-Format : -b "block" -f "file" -m "facet" -s "start" -e "end" --combine/--no-combine --weak/--no-weak --all/--only-human --mean-normalize/--no-mean-normalize
+Format : -b "block" -f "file" -m "facet" -s "start" -e "end" --combine/--no-combine --weak/--no-weak --all/--only-human --mean-normalize/--no-mean-normalize --global-mean/--no-global-mean
 
 options:
 -b - block size (in seconds) [default - 1000 milliseconds]
@@ -19,11 +19,12 @@ options:
 --weak - pick weak category if True else do max vote to resolve conflict [default - False]
 --all - consider shamya-mark-facet if True else consider only humans shamya-mark [default - True]
 --mean-normalize - do mean normalization on facet data before [default - True]
+--global-mean - uses a global mean for mean normalization [default - False]
 
 Examples:
 -f elan8-shamya-mark.eaf elan10-shamya-mark.eaf -m 8.FACET_emotient_v4.1.csv 10.FACET_emotient_v4.1.csv
--f elan8-shamya-mark.eaf elan10-shamya-mark.eaf -s 2300058 1681600 -e 2848100 2365200 -m 8.FACET_emotient_v4.1.csv 10.FACET_emotient_v4.1.csv
--b 2000 -f elan2-shamya-mark.eaf-m 2.FACET_emotient_v4.1.csv
+-f elan8-shamya-mark.eaf elan10-shamya-mark.eaf -s 2300058 1681600 -e 2848100 2365200 -m 8.FACET_emotient_v4.1.csv 10.FACET_emotient_v4.1.csv --global-mean
+-b 2000 -f elan2-shamya-mark.eaf -m 2.FACET_emotient_v4.1.csv 
 -b 1000 -f elan8-shamya-mark.eaf --no-combine -m 8.FACET_emotient_v4.1.csv
 -b 1000 -f elan8-shamya-mark.eaf --combine --weak -m 8.FACET_emotient_v4.1.csv
 -b 1000 -f elan8-shamya-mark.eaf --combine --weak -m 8.FACET_emotient_v4.1.csv -all
@@ -39,7 +40,7 @@ from xml.dom.minidom import parse as pr
 import argparse,sys
 import csv
 from operator import itemgetter
-from MeanNormalize import get_facet_data_all, get_facet_data_combined
+from MeanNormalize import get_facet_data_all, get_facet_data_combined, get_global_mean
 
 '''transforms the input annotations into usable matrix'''
 def transform_annotation(ts,start_time,end_time,ts_dict):
@@ -215,6 +216,11 @@ def main(args):
     parser.add_argument('--no-mean-normalize', dest='mean', action='store_false')
     parser.set_defaults(mean=True)
     
+    parser.add_argument('--global-mean', dest='global_mean', action='store_true')
+    parser.add_argument('--no-global-mean', dest='global_mean', action='store_false')
+    parser.set_defaults(mean=False)
+    
+    
     args = parser.parse_args()
     
     if args.block is not None:
@@ -229,13 +235,16 @@ def main(args):
     weak = args.weak 
     all = args.all
     mean = args.mean
+    global_mean = args.global_mean
     start_time_list = args.start if args.start is not None else None
     end_time_list = args.end if args.end is not None else None
     
     print("file =", filename, "facet file =", facet_file, "block =", block, "combine =", combine, "weak =", weak)
+    time_dict_list = []
     emotion_kappa = []
-    
+        
     total = len(filename)
+    
     for i in range(total):
         print(filename[i])
         tree = pr(filename[i])
@@ -243,19 +252,28 @@ def main(args):
         tiers = annotationTree.getElementsByTagName("TIER")
         #put time tier to a dictionary
         ts_dict = {}
-            
+                
         times = annotationTree.getElementsByTagName("TIME_ORDER")
         for time in times:
             time_slots = time.getElementsByTagName("TIME_SLOT")
             for time_slot in time_slots:
                 ts_dict[time_slot.getAttribute("TIME_SLOT_ID")] = time_slot.getAttribute("TIME_VALUE")
+
+        time_dict_list.append(ts_dict)
+    
+    #get start and end time
+    if start_time_list is None or end_time_list is None:
+        start_time_list = []
+        end_time_list = []
         
-        if start_time_list is None or end_time_list is None:
-            
+        for i in range(total):
+            ts_dict = time_dict_list[i]
             start_time_slot = None
             end_time_slot = None
-            
             #go to the Shamya_looking-at-screenTier tier
+            tree = pr(filename[i])
+            annotationTree = tree.documentElement
+            tiers = annotationTree.getElementsByTagName("TIER")
             for tier in tiers:
                 if tier.getAttribute("TIER_ID") == "Shamya_looking-at-screenTier":
                     annotations = tier.getElementsByTagName("ANNOTATION")
@@ -265,16 +283,33 @@ def main(args):
                             if start_time_slot is None:
                                 start_time_slot = align_annotation.getAttribute("TIME_SLOT_REF1")
                             end_time_slot = align_annotation.getAttribute("TIME_SLOT_REF2")
-            
+                
             print("start_time_slot = ", start_time_slot, " end_time_slot = ", end_time_slot)
-            
+                
             #pick start time
-            start_time = int(ts_dict[start_time_slot])
-            end_time = int(ts_dict[end_time_slot])
-        else:
-            start_time = int(start_time_list[i])
-            end_time = int(start_time_list[i])
-            
+            start_time_list.append(int(ts_dict[start_time_slot]))
+            end_time_list.append(int(ts_dict[end_time_slot]))
+     
+        
+    if global_mean is True:
+        print("Finding global mean...")
+        global_mean_neutral, global_mean_other = get_global_mean(facet_file, start_time_list, end_time_list)
+    else:
+        global_mean_neutral = None
+        global_mean_other = None
+    
+    
+    for i in range(total): 
+        print(filename[i])
+        tree = pr(filename[i])
+        annotationTree = tree.documentElement
+        tiers = annotationTree.getElementsByTagName("TIER")
+        #put time tier to a dictionary
+        ts_dict = time_dict_list[i]
+                      
+        start_time = int(start_time_list[i])
+        end_time = int(end_time_list[i])
+
         print("start_time = ", start_time, " end_time = ", end_time)
         
         #Shamya annotations
@@ -289,38 +324,43 @@ def main(args):
         mark_full_ts = transform_annotation(mark_ts, start_time, end_time,ts_dict)
         print("mark full ts", mark_full_ts)
         
-        print(facet_file[i])
-        #get FACET data
-        #Mean Normalized
-        if mean is True:
-            if combine is True:
-                #has to be separate as mean of max would differ with/without the confusion column
-                facet = get_facet_data_combined(facet_file[i], start_time, end_time)
-            else:
-                facet = get_facet_data_all(facet_file[i], start_time, end_time)
-        else:
-            facet = get_facet_data(facet_file[i], start_time, end_time)
-            
-        print("facet full", facet[:10])
         
         #get annotation based on the block size
         shamya_annot = regularize_annotations(shamya_full_ts, block, weak)
         print("shamya block sized annot", shamya_annot)
         mark_annot = regularize_annotations(mark_full_ts, block, weak)
         print("mark block sized annot", mark_annot)
-        facet_annot = regularize_annotations(facet, block, weak)
-        print("facet block sized annot", facet_annot)
         
-        print("FACET - Neutral =", facet_annot.count('Neutral'), "Confused =", facet_annot.count('Confused'), "Other =", facet_annot.count('Other'), "Skip =", facet_annot.count('Skip'))
-        print("SHAMYA - Neutral =", shamya_annot.count('Neutral'), "Confused =", shamya_annot.count('Confused'), "Other =", shamya_annot.count('Other'), "Skip =", shamya_annot.count('Skip'))
-        print("MARK - Neutral =", mark_annot.count('Neutral'), "Confused =", mark_annot.count('Confused'), "Other =", mark_annot.count('Other'), "Skip =", mark_annot.count('Skip'))
+        if all is True:
+            print(facet_file[i])
+            
+            #get FACET data
+            #Mean Normalized
+            if mean is True:                    
+                if combine is True:
+                    #has to be separate as mean of max would differ with/without the confusion column
+                    facet = get_facet_data_combined(facet_file[i], start_time, end_time, global_mean_neutral, global_mean_other)
+                else:
+                    facet = get_facet_data_all(facet_file[i], start_time, end_time, global_mean_neutral, global_mean_other)
+            else:
+                facet = get_facet_data(facet_file[i], start_time, end_time)
+                
+            print("facet full", facet[:10])
+            
+            facet_annot = regularize_annotations(facet, block, weak)
+            print("facet block sized annot", facet_annot)
+            
+            #print("FACET - Neutral =", facet_annot.count('Neutral'), "Confused =", facet_annot.count('Confused'), "Other =", facet_annot.count('Other'), "Skip =", facet_annot.count('Skip'))
+            
+        #print("SHAMYA - Neutral =", shamya_annot.count('Neutral'), "Confused =", shamya_annot.count('Confused'), "Other =", shamya_annot.count('Other'), "Skip =", shamya_annot.count('Skip'))
+        #print("MARK - Neutral =", mark_annot.count('Neutral'), "Confused =", mark_annot.count('Confused'), "Other =", mark_annot.count('Other'), "Skip =", mark_annot.count('Skip'))
         
         #Delete skips and combine annotations
         if all is True:
             #change [s,m,f] if you need pairwise [m,f] or [s,f]
             annot = [[s,m,f] for s,m,f in zip(shamya_annot,mark_annot, facet_annot) if s != "Skip" and m != "Skip"]
         else:
-            annot = [[s,m] for s,m,f in zip(shamya_annot,mark_annot, facet_annot) if s != "Skip" and m != "Skip"]
+            annot = [[s,m] for s,m in zip(shamya_annot,mark_annot) if s != "Skip" and m != "Skip"]
         
         #[Neutral, Confused, Other]
         emot = [[0,0,0] for i in range((len(annot)))]
