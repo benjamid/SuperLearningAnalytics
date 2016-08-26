@@ -1,7 +1,45 @@
 import csv
 from operator import itemgetter
 
-def get_facet_data_all(file, start_time, end_time):
+#gets the global mean of neutral and global mean of max of other
+def get_global_mean(facet_file, start_time_list, end_time_list):
+    
+    neutral = []
+    other = []
+    
+    for i in range(len(facet_file)):
+        facet = facet_file[i]
+        start_time = start_time_list[i]
+        end_time = end_time_list[i]
+    
+        i = [5,6,7,8,9,11,13,12,14]
+        with open(facet,'r') as file:
+            reader = csv.reader(file, dialect='excel')
+            next(reader, None)
+            for row in reader:
+                if len(row) < 1:
+                    break
+                if float(row[0]) > start_time/1000 and float(row[0]) < end_time/1000:
+                    n = float(row[10])
+                    o = [float(row[ind]) for ind in i]
+                    neutral.append(n)
+                    other.append(o)
+    
+    #global mean
+    global_mean_neutral = sum(neutral)/len(neutral)
+    
+    max_other = []
+    max_ind = []
+    for o in other:
+        max_ind.append(max(enumerate(o), key=itemgetter(1))[0])
+        max_other.append(max(enumerate(o), key=itemgetter(1))[1])
+    
+    global_mean_other = sum(max_other)/len(max_other)
+
+    
+    return global_mean_neutral, global_mean_other
+
+def get_facet_data_all(file, start_time, end_time, global_mean_neutral, global_mean_other):
     time = []
     neutral = []
     confusion = []
@@ -26,10 +64,16 @@ def get_facet_data_all(file, start_time, end_time):
     
     
     #mean normalize value
-    avg = sum(neutral)/len(neutral)
+    if global_mean_neutral is None:
+        avg = sum(neutral)/len(neutral)
+    else:
+        avg = global_mean_neutral
     mean_norm_neutral = [i-avg for i in neutral]
     
-    avg = sum(confusion)/len(confusion)
+    if global_mean_other is None:
+        avg = sum(confusion)/len(confusion)
+    else:
+        avg = global_mean_other
     mean_norm_confusion = [i-avg for i in confusion]  
     
     max_other = []
@@ -38,7 +82,11 @@ def get_facet_data_all(file, start_time, end_time):
         max_ind.append(max(enumerate(o), key=itemgetter(1))[0])
         max_other.append(max(enumerate(o), key=itemgetter(1))[1])
     
-    avg = sum(max_other)/len(max_other)
+    if global_mean_other is None:
+        avg = sum(max_other)/len(max_other)
+    else:
+        avg = global_mean_other
+   
     mean_norm_max_other = [i-avg for i in max_other]
     
     l = len(mean_norm_neutral)
@@ -58,7 +106,7 @@ def get_facet_data_all(file, start_time, end_time):
     
     return emo
 
-def get_facet_data_combined(file, start_time, end_time):
+def get_facet_data_combined(file, start_time, end_time, global_mean_neutral, global_mean_other):
     time = []
     neutral = []
     other = []
@@ -80,7 +128,10 @@ def get_facet_data_combined(file, start_time, end_time):
     
     
     #mean normalize value
-    avg = sum(neutral)/len(neutral)
+    if global_mean_neutral is None:
+        avg = sum(neutral)/len(neutral)
+    else:
+        avg = global_mean_neutral
     mean_norm_neutral = [i-avg for i in neutral]
     
     
@@ -90,7 +141,10 @@ def get_facet_data_combined(file, start_time, end_time):
         max_ind.append(max(enumerate(o), key=itemgetter(1))[0])
         max_other.append(max(enumerate(o), key=itemgetter(1))[1])
     
-    avg = sum(max_other)/len(max_other)
+    if global_mean_other is None:
+        avg = sum(max_other)/len(max_other)
+    else:
+        avg = global_mean_other
     mean_norm_max_other = [i-avg for i in max_other] 
     
     l = len(mean_norm_neutral)
