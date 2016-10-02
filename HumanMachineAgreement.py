@@ -191,6 +191,19 @@ def get_facet_data(file,start_time, end_time):
     
     return facet
 
+def get_binary_emotion(facet):
+    with open('binary_emotion.csv', 'w') as csvfile:
+        writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(['time','Neutral', 'Other', 'Confused'])
+        for f in facet:
+            if f[1] == 'Neutral':
+                r = [f[0]/1000,1,0,0]
+            elif f[1] == 'Other':
+                r = [f[0]/1000,0,1,0]
+            else:
+                r = [f[0]/1000,0,0,1]
+            writer.writerow(r)
+
 def main(args):
     """ parse command like argument"""
     parser = argparse.ArgumentParser()
@@ -220,6 +233,10 @@ def main(args):
     parser.add_argument('--no-global-mean', dest='global_mean', action='store_false')
     parser.set_defaults(mean=False)
     
+    parser.add_argument('--binary', dest='binary', action='store_true')
+    parser.add_argument('--no-binary', dest='binary', action='store_false')
+    parser.set_defaults(mean=False)
+    
     
     args = parser.parse_args()
     
@@ -236,6 +253,7 @@ def main(args):
     all = args.all
     mean = args.mean
     global_mean = args.global_mean
+    binary = args.binary
     start_time_list = args.start if args.start is not None else None
     end_time_list = args.end if args.end is not None else None
     
@@ -346,6 +364,9 @@ def main(args):
                 facet = get_facet_data(facet_file[i], start_time, end_time)
                 
             print("facet full", facet[:10])
+            
+            if binary is True:
+                get_binary_emotion(facet)
             
             facet_annot = regularize_annotations(facet, block, weak)
             print("facet block sized annot", facet_annot)
