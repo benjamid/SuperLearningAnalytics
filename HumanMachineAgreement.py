@@ -7,7 +7,7 @@ Emotion Analysis: Calculate inter annotator agreement
 Needs Fleiss kappa implementation (fleiss.py)
 
 command line arguments -
-Format : -b "block" -f "file" -m "facet" -s "start" -e "end" --combine/--no-combine --weak/--no-weak --all/--only-human --mean-normalize/--no-mean-normalize --global-mean/--no-global-mean
+Format : -b "block" -f "file" -m "facet" -s "start" -e "end" --combine/--no-combine --weak/--no-weak --all/--only-human --mean-normalize/--no-mean-normalize --global-mean/--no-global-mean --binary/--no-binary
 
 options:
 -b - block size (in seconds) [default - 1000 milliseconds]
@@ -20,6 +20,7 @@ options:
 --all - consider shamya-mark-facet if True else consider only humans shamya-mark [default - True]
 --mean-normalize - do mean normalization on facet data before [default - True]
 --global-mean - uses a global mean for mean normalization [default - False]
+--binary - get a binary emotion facet file [default - false]
 
 Examples:
 -f elan8-shamya-mark.eaf elan10-shamya-mark.eaf -m 8.FACET_emotient_v4.1.csv 10.FACET_emotient_v4.1.csv
